@@ -5,13 +5,17 @@ import asyncio
 import time
 import webbrowser
 from threading import Lock
-from typing import Callable, Coroutine, List, Optional
+from typing import Callable, Coroutine, List, Optional, Any
 
 from azure.core.exceptions import ClientAuthenticationError
+from azure.core.tracing.decorator import distributed_trace
+from azure.core.tracing.decorator_async import distributed_trace_async
+from azure.core.tracing import SpanKind
 from azure.identity import AzureCliCredential, ManagedIdentityCredential
 from msal import ConfidentialClientApplication, PublicClientApplication
 
 from ._cloud_settings import CloudInfo, CloudSettings
+from ._telemetry import KustoTracing
 from .exceptions import KustoAioSyntaxError, KustoAsyncUsageError, KustoClientError
 
 try:
@@ -23,9 +27,14 @@ except ImportError:
 
 
 try:
-    from azure.identity.aio import ManagedIdentityCredential as AsyncManagedIdentityCredential, AzureCliCredential as AsyncAzureCliCredential
-except ImportError:
+    from azure.identity.aio import (
+        ManagedIdentityCredential as AsyncManagedIdentityCredential,
+        AzureCliCredential as AsyncAzureCliCredential,
+        DefaultAzureCredential as AsyncDefaultAzureCredential,
+    )
 
+    from azure.core.credentials_async import AsyncTokenCredential
+except ImportError:
     # These are here in case the user doesn't have the aio optional dependency installed, but still tries to use async.
     # They will give them a useful error message, and will appease linters.
     class AsyncManagedIdentityCredential:
@@ -33,6 +42,14 @@ except ImportError:
             raise KustoAioSyntaxError()
 
     class AsyncAzureCliCredential:
+        def __init__(self):
+            raise KustoAioSyntaxError()
+
+    class AsyncDefaultAzureCredential:
+        def __init__(self):
+            raise KustoAioSyntaxError()
+
+    class AsyncTokenCredential:
         def __init__(self):
             raise KustoAioSyntaxError()
 
@@ -102,7 +119,7 @@ class TokenProviderBase(abc.ABC):
                 return
 
             if not self._resources_initialized:
-                await (sync_to_async(self._init_resources)())
+                await sync_to_async(self._init_resources)()
                 self._resources_initialized = True
 
             if init_only_resources:
@@ -116,16 +133,23 @@ class TokenProviderBase(abc.ABC):
 
     def get_token(self):
         """Get a token silently from cache or authenticate if cached token is not found"""
-        if self.is_async:
-            raise KustoAsyncUsageError("get_token", self.is_async)
-        self._init_once()
 
-        token = self._get_token_from_cache_impl()
-        if token is None:
-            with self._lock:
-                token = self._get_token_impl()
+        @distributed_trace(name_of_span=f"{self.name()}.get_token", tracing_attributes=self.context(), kind=SpanKind.CLIENT)
+        def _get_token():
+            if self.is_async:
+                raise KustoAsyncUsageError("get_token", self.is_async)
+            self._init_once()
 
-        return self._valid_token_or_throw(token)
+            token = self._get_token_from_cache_impl()
+            if token is None:
+                with self._lock:
+                    token = KustoTracing.call_func_tracing(
+                        self._get_token_impl, name_of_span=f"{self.name()}.get_token_impl", tracing_attributes=self.context()
+                    )
+
+            return self._valid_token_or_throw(token)
+
+        return _get_token()
 
     def context(self) -> dict:
         if self.is_async:
@@ -143,18 +167,32 @@ class TokenProviderBase(abc.ABC):
     async def get_token_async(self):
         """Get a token asynchronously silently from cache or authenticate if cached token is not found"""
 
-        if not self.is_async:
-            raise KustoAsyncUsageError("get_token_async", self.is_async)
+        context = await self.context_async()
 
-        await self._init_once_async()
+        @distributed_trace_async(name_of_span=f"{self.name()}.get_token_async", tracing_attributes=context, kind=SpanKind.CLIENT)
+        async def _get_token_async():
+            if not self.is_async:
+                raise KustoAsyncUsageError("get_token_async", self.is_async)
 
-        token = self._get_token_from_cache_impl()
+            await self._init_once_async()
 
-        if token is None:
-            async with self._async_lock:
-                token = await self._get_token_impl_async()
+            token = self._get_token_from_cache_impl()
 
-        return self._valid_token_or_throw(token)
+            if token is None:
+                async with self._async_lock:
+                    token = await KustoTracing.call_func_tracing_async(
+                        self._get_token_impl_async, name_of_span=f"{self.name()}.get_token_impl_async", tracing_attributes=context
+                    )
+
+            return self._valid_token_or_throw(token)
+
+        return await _get_token_async()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     @staticmethod
     @abc.abstractmethod
@@ -620,3 +658,53 @@ class ApplicationCertificateTokenProvider(CloudInfoTokenProvider):
     def _get_token_from_cache_impl(self) -> dict:
         token = self._msal_client.acquire_token_silent(scopes=self._scopes, account=None)
         return self._valid_token_or_none(token)
+
+
+class AzureIdentityTokenCredentialProvider(CloudInfoTokenProvider):
+    """Acquire a token using an Azure Identity credential"""
+
+    def __init__(
+        self,
+        kusto_uri: str,
+        is_async: bool = False,
+        credential: Optional[Any] = None,
+        credential_from_login_endpoint: Optional[Callable[[str], Any]] = None,
+    ):
+        super().__init__(kusto_uri, is_async)
+
+        self.credential = credential
+        self.credential_from_login_endpoint = credential_from_login_endpoint
+
+        if self.credential is None and self.credential_from_login_endpoint is None:
+            raise KustoClientError("Either a credential or a credential_from_login_endpoint must be provided")
+
+    @staticmethod
+    def name() -> str:
+        return "AzureIdentityTokenProvider"
+
+    def _context_impl(self) -> dict:
+        return {"credential": self.credential}
+
+    def _init_impl(self):
+        if self.credential is None:
+            self.credential = self.credential_from_login_endpoint(self._cloud_info.login_endpoint)
+
+    def _get_token_impl(self) -> Optional[dict]:
+        t = self.credential.get_token(self._scopes[0])
+        return {TokenConstants.MSAL_TOKEN_TYPE: TokenConstants.BEARER_TYPE, TokenConstants.MSAL_ACCESS_TOKEN: t.token}
+
+    async def _get_token_impl_async(self) -> Optional[dict]:
+        t = await self.credential.get_token(self._scopes[0])
+        return {TokenConstants.MSAL_TOKEN_TYPE: TokenConstants.BEARER_TYPE, TokenConstants.MSAL_ACCESS_TOKEN: t.token}
+
+    def _get_token_from_cache_impl(self) -> Optional[dict]:
+        return None
+
+    def close(self):
+        if self.credential is not None:
+            if self.is_async:
+                asyncio.get_event_loop().run_in_executor(None, self.credential.close())
+            else:
+                self.credential.close()
+            self.credential = None
+            self.credential_from_login_endpoint = None

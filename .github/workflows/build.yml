@@ -1,0 +1,45 @@
+# This workflow will install the dependencies, run tests and lint every push
+
+name: Python package
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ '3.7']
+    env:
+      PYTHON: ${{ matrix.python-version }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: AI Code Reviewer
+        if: always()
+        uses: AsafMah/ai-coder-eviewer@32f7a83
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - uses: purvesh-d/AIReviewRadar@1.0.2
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          debug: false
+          review_comment_lgtm: false
+      - uses: AsafMah/ai-coder-eviewer@main
+        if: always()
+        name: ChatGPT Review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

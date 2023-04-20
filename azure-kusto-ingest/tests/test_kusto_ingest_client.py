@@ -236,6 +236,8 @@ class TestQueuedIngestClient:
             "https://storageaccount.blob.core.windows.net/tempstorage/database__table__11111111-1111-1111-1111-111111111111__dataset.csv.gz?",
         )
 
+        ingest_client.close()
+
     @responses.activate
     @pytest.mark.skipif(not pandas_installed, reason="requires pandas")
     @patch("azure.kusto.ingest.managed_streaming_ingest_client.ManagedStreamingIngestClient.MAX_STREAMING_SIZE_IN_BYTES", new=0)
