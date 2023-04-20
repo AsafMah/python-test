@@ -35,12 +35,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      - name: ChatGTP explain code
+      - name: ChatGPT explain code
         uses: cirolini/chatgpt-github-actions@v1.3
         with:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_pr_id: ${{ github.event.number }}
+          openai_max_tokens: 4096
       - name: AutoPR
         uses: irgolic/AutoPR@main
         env:
