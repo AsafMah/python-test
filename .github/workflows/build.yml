@@ -31,9 +31,27 @@ jobs:
         with:
           debug: false
           review_comment_lgtm: false
-      - uses: AsafMah/ai-coder-eviewer@main
-        if: always()
-        name: ChatGPT Review
+      - uses: anc95/ChatGPT-CodeReview@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: ChatGTP explain code
+        uses: cirolini/chatgpt-github-actions@v1.3
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_pr_id: ${{ github.event.number }}
+      - name: AutoPR
+        uses: irgolic/AutoPR@main
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          event: ${{ toJson(github.event) }}
+          event_name: ${{ github.event_name }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          model: gpt-3.5-turbo
+          context_limit: 4096
+      - uses: fluxninja/openai-pr-reviewer@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
