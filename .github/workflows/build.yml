@@ -25,7 +25,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: AI Code Reviewer
         if: always()
-        uses: freeedcom/ai-codereviewer@main
+        uses: AsafMah/ai-coder-eviewer@main
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -41,8 +41,8 @@ jobs:
         if: always()
         name: ChatGPT Review
         env:
-         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
   publish-test-results:
     name: "Publish Unit Tests Results"
