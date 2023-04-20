@@ -23,27 +23,22 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: purvesh-d/AIReviewRadar@1.0.2
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        with:
-          debug: false
-          review_comment_lgtm: false
       - uses: anc95/ChatGPT-CodeReview@main
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       - name: ChatGPT explain code
         uses: cirolini/chatgpt-github-actions@v1.3
+        if: always()
         with:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_pr_id: ${{ github.event.number }}
-          openai_max_tokens: 4096
+          openai_max_tokens: 2048
       - name: AutoPR
         uses: irgolic/AutoPR@main
+        if: always()
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
@@ -53,6 +48,15 @@ jobs:
           model: gpt-3.5-turbo
           context_limit: 4096
       - uses: fluxninja/openai-pr-reviewer@latest
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - uses: purvesh-d/AIReviewRadar@1.0.2
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        with:
+          debug: false
+          review_comment_lgtm: false
