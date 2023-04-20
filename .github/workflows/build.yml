@@ -35,18 +35,7 @@ jobs:
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_pr_id: ${{ github.event.number }}
-          openai_max_tokens: 2048
-      - name: AutoPR
-        uses: irgolic/AutoPR@main
-        if: always()
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        with:
-          event: ${{ toJson(github.event) }}
-          event_name: ${{ github.event_name }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          model: gpt-3.5-turbo
-          context_limit: 4096
+          openai_max_tokens: 1300
       - uses: fluxninja/openai-pr-reviewer@latest
         if: always()
         env:
