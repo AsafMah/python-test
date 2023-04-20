@@ -37,26 +37,9 @@ jobs:
         with:
           debug: false
           review_comment_lgtm: false
-      - uses: AsafMah/ai-coder-eviewer
+      - uses: AsafMah/ai-coder-eviewer@main
         if: always()
         name: ChatGPT Review
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-  publish-test-results:
-    name: "Publish Unit Tests Results"
-    needs: build
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v2
-        with:
-          path: artifacts
-
-      - name: Publish Unit Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v1
-        with:
-          files: artifacts/**/*.xml
