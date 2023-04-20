@@ -19,11 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: purvesh-d/AIReviewRadar@1.0.2
+      - uses: fluxninja/openai-pr-reviewer@latest
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        with:
-          debug: false
-          review_comment_lgtm: false
