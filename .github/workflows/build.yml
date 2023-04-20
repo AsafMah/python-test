@@ -25,7 +25,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: AI Code Reviewer
         if: always()
-        uses: AsafMah/ai-coder-eviewer@32f7a83
+        uses: AsafMah/ai-coder-eviewer@32f7a8317cc7ad6064db526bde25a956f6c96309
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
