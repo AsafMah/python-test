@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: fluxninja/openai-pr-reviewer@latest
+      - uses: anc95/ChatGPT-CodeReview@main
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
