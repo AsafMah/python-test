@@ -59,7 +59,11 @@ jobs:
               - High-level summary (comment on the overall change instead of 
                 specific files within 80 words. Use simple language and be concise.)
               - Table of files and their summaries. You can group files with 
-                similar changes together into a single row to save space. Make them into bullet points. Use simple language and be concise.
+                similar changes together into a single row to save space. 
+                Make them into bullet points. 
+                Use simple language and be concise.
+                Use a markdown table to show the file names and their summaries.
+            
             
             Avoid additional commentary as this summary will be added as a 
             comment on the GitHub pull request.
