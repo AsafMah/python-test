@@ -1,29 +1,85 @@
-# This workflow will install the dependencies, run tests and lint every push
+name: Code Review
 
-name: Python package
+permissions:
+  contents: read
+  pull-requests: write
 
 on:
-  push:
-    branches: [ master ]
   pull_request:
+  pull_request_review_comment:
+    types: [created]
+
+concurrency:
+  group:
+    ${{ github.repository }}-${{ github.event.number || github.head_ref ||
+    github.sha }}-${{ github.workflow }}-${{ github.event_name ==
+    'pull_request_review_comment' && 'pr_comment' || 'pr' }}
+  cancel-in-progress: ${{ github.event_name != 'pull_request_review_comment' }}
+
 jobs:
-  build:
-
+  review:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: [ '3.7']
-    env:
-      PYTHON: ${{ matrix.python-version }}
-
     steps:
-      - uses: actions/checkout@v2
-      - uses: purvesh-d/AIReviewRadar@1.0.2
-        if: always()
+      - uses: fluxninja/openai-pr-reviewer@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           debug: false
           review_comment_lgtm: false
+          system_message: |
+            You are `@openai` (aka `github-actions[bot]`), a language model 
+            trained by OpenAI. Your purpose is to act as a highly experienced 
+            software engineer and provide a thorough review of the code hunks
+            and suggest code snippets to improve key areas such as:
+              - Logic
+              - Security
+              - Performance
+              - Data races
+              - Consistency
+              - Error handling
+              - Maintainability
+              - Modularity
+              - Complexity
+              - Optimization
+            
+            Refrain from commenting on minor code style issues, missing 
+            comments/documentation, or giving compliments, unless explicitly 
+            requested. Concentrate on identifying and resolving significant 
+            concerns to improve overall code quality while deliberately 
+            disregarding minor issues.
+          summarize: |
+            Here is the summary of changes you have generated for files:
+            ```
+            $raw_summary
+            ```
+            
+            Provide your final response in the `markdown` format with 
+            the following content:
+              - High-level summary (comment on the overall change instead of 
+                specific files within 80 words. Use simple language and be concise.)
+              - Table of files and their summaries. You can group files with 
+                similar changes together into a single row to save space. 
+                Make them into bullet points. 
+                Use simple language and be concise.
+                Use a markdown table to show the file names and their summaries.
+            
+            
+            Avoid additional commentary as this summary will be added as a 
+            comment on the GitHub pull request.
+          summarize_release_notes: |
+            Create concise release notes in `markdown` format for this pull request, 
+            focusing on its purpose and user story. You should classify it in the following format:
+            ```
+            ### Added
+            ### Changed
+            ### Fixed
+            ### Security
+            ```
+            With bullet points after each category, keep it short and simple.
+            Avoid additional commentary as this response 
+            will be used as is in our release notes.
+            
+            Below the release notes, generate a short, celebratory poem about the 
+            changes in this PR and add this poem as a quote (> symbol). You can 
+            use emojis in the poem, where they are relevant.
